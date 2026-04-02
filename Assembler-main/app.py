@@ -223,29 +223,42 @@ def _build_tree(nt, table, i, j):
 
 
 def _to_cnf(grammar):
-    cnf     = {}
+    cnf = {}
     counter = [0]
+    term_map = {}
 
     def fresh():
         counter[0] += 1
         return f"X{counter[0]}"
 
+    def get_term_var(t):
+        if t not in term_map:
+            v = fresh()
+            term_map[t] = v
+            cnf.setdefault(v, []).append([t])
+        return term_map[t]
+
     for nt, rules in grammar.items():
         cnf.setdefault(nt, [])
         for rule in rules:
-            if len(rule) <= 2:
-                cnf[nt].append(rule)
-            else:
-                syms = list(rule)
-                cur  = nt
-                while len(syms) > 2:
-                    new_nt = fresh()
-                    cnf.setdefault(cur, []).append([syms[0], new_nt])
-                    cur  = new_nt
-                    syms = syms[1:]
-                cnf.setdefault(cur, []).append(syms)
-    return cnf
+            new_rule = []
 
+            # 🔥 replace terminals with variables
+            for sym in rule:
+                if sym.islower():  # terminal
+                    new_rule.append(get_term_var(sym))
+                else:
+                    new_rule.append(sym)
+
+            # 🔥 break into binary rules
+            while len(new_rule) > 2:
+                new_nt = fresh()
+                cnf.setdefault(new_nt, []).append(new_rule[1:])
+                new_rule = [new_rule[0], new_nt]
+
+            cnf[nt].append(new_rule)
+
+    return cnf
 
 @app.route("/parse_clr", methods=["POST"])
 def parse_clr():
